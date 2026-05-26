@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Windows 로그인 · 그린 매트</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            height: 100vh;
+            width: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Malgun Gothic', 'Roboto', system-ui, sans-serif;
+            /* 성숙한 그린 톤 그라데이션 */
+            background: linear-gradient(145deg, #1e3a2f 0%, #0c261c 100%);
+            position: relative;
+        }
+
+        /* 미세한 앰비언트 라이트 (구름 제거) */
+        .bg-ambient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            background: radial-gradient(circle at 20% 30%, rgba(70, 110, 80, 0.2), transparent 70%);
+        }
+
+        /* 로그인 카드 — 다크 그린 모던 글래스 */
+        .login-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 460px;
+            background: rgba(15, 30, 22, 0.75);
+            backdrop-filter: blur(20px);
+            border-radius: 36px;
+            box-shadow: 0 25px 45px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(120, 160, 110, 0.3);
+            padding: 2rem 2rem 2.2rem;
+            z-index: 10;
+            transition: all 0.25s ease;
+        }
+
+        .user-icon { text-align: center; margin-bottom: 1.5rem; }
+        .avatar-circle {
+            background: linear-gradient(135deg, #2c5a3e, #1e3a2a);
+            width: 85px; height: 85px; margin: 0 auto 1rem; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 3rem; box-shadow: 0 10px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,200,0.15);
+            border: 2px solid rgba(180, 210, 150, 0.6);
+        }
+        .display-name {
+            font-size: 1.8rem; font-weight: 600; color: #f0f7ea; text-shadow: 0 2px 5px rgba(0,0,0,0.4);
+            background: rgba(0,0,0,0.35); display: inline-block; padding: 0.2rem 1rem; border-radius: 50px;
+            backdrop-filter: blur(4px);
+        }
+        .sub-text { color: #cddfc7; font-size: 0.7rem; margin-top: 0.5rem; opacity: 0.85; }
+
+        .input-section { margin: 1.8rem 0 1rem; }
+        .input-label { color: #e2f0da; font-size: 0.8rem; margin-bottom: 0.5rem; font-weight: 500; display: flex; gap: 6px; }
+        .password-box input {
+            width: 100%; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(160, 190, 130, 0.5);
+            border-radius: 44px; padding: 0.9rem 1.2rem; font-size: 1rem; font-family: monospace;
+            color: #f0f7ea; outline: none; transition: all 0.2s; backdrop-filter: blur(5px);
+        }
+        .password-box input:focus { border-color: #b8d9a6; background: rgba(0, 0, 0, 0.7); box-shadow: 0 0 0 2px rgba(150, 200, 120, 0.4); }
+
+        .unlock-button {
+            background: linear-gradient(100deg, #2b6e47, #1c4f33); border: none; width: 100%; padding: 0.85rem;
+            border-radius: 60px; font-weight: bold; font-size: 1.05rem; color: #f9fff5; cursor: pointer;
+            transition: 0.2s; margin-top: 0.8rem; box-shadow: 0 5px 12px rgba(0,0,0,0.4);
+            display: flex; justify-content: center; align-items: center; gap: 8px; font-family: inherit;
+        }
+        .unlock-button:hover { background: linear-gradient(100deg, #398758, #246b42); transform: scale(0.98); }
+        .error-feedback {
+            margin-top: 1rem; text-align: center; font-size: 0.85rem; font-weight: 500;
+            min-height: 2.5rem; color: #ffbc9a; background: rgba(150, 50, 30, 0.25);
+            border-radius: 40px; padding: 0.4rem 0.8rem; width: fit-content; margin: 1rem auto 0;
+            backdrop-filter: blur(12px);
+        }
+        .error-feedback:empty { display: none; }
+        .footer-note {
+            margin-top: 1rem; font-size: 0.7rem; text-align: center; color: #bfddae;
+            background: rgba(0,0,0,0.3); width: fit-content; margin-left: auto; margin-right: auto;
+            padding: 0.2rem 0.8rem; border-radius: 40px;
+        }
+
+        /* 데스크톱 영역 (언락 후) 그린 매트 */
+        .desktop-success {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 20% 30%, #2f5a42, #17382a);
+            z-index: 1000; display: flex; flex-direction: column;
+            opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+        }
+        .desktop-success.active { opacity: 1; visibility: visible; transition: opacity 0.35s ease, visibility 0s linear 0s; }
+
+        .desktop-bg {
+            position: absolute; width: 100%; height: 100%; overflow: hidden; z-index: 0;
+            background-image: radial-gradient(rgba(200, 230, 170, 0.08) 1px, transparent 1px);
+            background-size: 32px 32px;
+        }
+
+        .desktop-icons {
+            position: relative; z-index: 2; display: flex; gap: 2rem; flex-wrap: wrap;
+            padding: 2rem; align-items: flex-start; justify-content: flex-start;
+        }
+        .desktop-icon {
+            display: flex; flex-direction: column; align-items: center; cursor: pointer;
+            width: 90px; transition: transform 0.1s; background: rgba(0, 0, 0, 0.35); border-radius: 20px;
+            padding: 0.6rem 0.2rem; backdrop-filter: blur(8px);
+            border: 1px solid rgba(160, 200, 120, 0.3);
+        }
+        .desktop-icon:hover { background: rgba(80, 120, 70, 0.5); transform: scale(1.02); border-color: #b8da9a; }
+        .icon-img { font-size: 3.2rem; filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5)); }
+        .icon-label {
+            margin-top: 0.5rem; font-size: 0.8rem; font-weight: 600; color: #f4ffea;
+            text-shadow: 0 1px 3px black; background: rgba(20, 35, 20, 0.7); padding: 0.2rem 0.6rem;
+            border-radius: 30px;
+        }
+
+        .lock-desktop-btn {
+            position: fixed; bottom: 20px; right: 20px; z-index: 20;
+            background: rgba(30, 55, 35, 0.85); backdrop-filter: blur(12px); border: 1px solid #6b9a5a;
+            padding: 10px 18px; border-radius: 40px; color: #e4ffcf; font-weight: bold;
+            font-family: inherit; cursor: pointer; transition: 0.2s; font-size: 0.9rem;
+        }
+        .lock-desktop-btn:hover { background: rgba(150, 80, 60, 0.8); border-color: #ffb38b; }
+
+        /* 모달 (카카오톡/브라우저) */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 20, 10, 0.7); backdrop-filter: blur(8px); z-index: 1001;
+            display: flex; align-items: center; justify-content: center; visibility: hidden;
+            opacity: 0; transition: 0.2s;
+        }
+        .modal-overlay.active { visibility: visible; opacity: 1; }
+        .modal-window {
+            background: #edf5e8; width: 85%; max-width: 500px; border-radius: 32px;
+            box-shadow: 0 30px 40px rgba(0,0,0,0.5); overflow: hidden; animation: pop 0.2s ease;
+            font-family: 'Malgun Gothic', sans-serif;
+        }
+        @keyframes pop {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-header {
+            background: #2f4d3c; padding: 1rem; color: #f6ffe6; display: flex;
+            justify-content: space-between; align-items: center; font-weight: bold;
+        }
+        .modal-header h3 { font-size: 1.2rem; }
+        .close-modal {
+            background: none; border: none; color: #e2ffc7; font-size: 1.5rem;
+            cursor: pointer; line-height: 1;
+        }
+        .modal-body {
+            padding: 1.5rem; color: #1c2f23; max-height: 60vh; overflow-y: auto;
+            text-align: center;
+        }
+        /* chat.jpg 스타일 */
+        .modal-body img {
+            max-width: 100%;
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .browser-history {
+            list-style: none; padding: 0;
+            text-align: left;
+        }
+        .browser-history li {
+            background: white; margin: 0.8rem 0; padding: 0.8rem; border-radius: 18px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 12px;
+            cursor: default;
+        }
+        .history-icon { font-size: 1.4rem; }
+        .history-link {
+            color: #2c6e44; font-weight: 600; text-decoration: none;
+            cursor: pointer;
+        }
+        .history-link:hover {
+            text-decoration: underline;
+            color: #1c4f33;
+        }
+        hr { margin: 0.5rem 0; border-color: #bdd6ae; }
+        .back-button {
+            background: #4f7a5c; border: none; padding: 8px 18px; border-radius: 40px;
+            color: white; font-weight: bold; cursor: pointer; margin-top: 20px;
+            transition: 0.2s; display: inline-block;
+        }
+        .back-button:hover { background: #2f5a42; }
+
+        @media (max-width: 500px) {
+            .login-panel { padding: 1.5rem; }
+            .display-name { font-size: 1.4rem; }
+            .avatar-circle { width: 70px; height: 70px; font-size: 2.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-ambient"></div>
+
+<!-- 로그인 패널 -->
+<div class="login-panel" id="loginPanel">
+    <div class="user-icon">
+        <div class="avatar-circle">🌿</div>
+        <div class="display-name">어학당 앞 'Pioneer'라고 적힌 유럽 비석</div>
+        <div class="sub-text">환영합니다 · 보안 인증</div>
+    </div>
+    <div class="input-section">
+        <div class="input-label"><span>🔐 비밀번호 확인</span></div>
+        <div class="password-box">
+            <input type="password" id="passwordInput" placeholder="비석의 인물 이름을 입력하세요" autocomplete="off" autofocus>
+        </div>
+    </div>
+    <button class="unlock-button" id="unlockBtn"><span>⏎</span> 잠금 해제</button>
+    <div id="errorMsg" class="error-feedback"></div>
+    <div class="footer-note">• 올바른 자격 증명을 사용하세요 •</div>
+</div>
+
+<!-- 데스크톱 (언락 후) -->
+<div id="desktopArea" class="desktop-success">
+    <div class="desktop-bg"></div>
+    <div class="desktop-icons">
+        <div class="desktop-icon" id="kakaoIcon">
+            <div class="icon-img">💬</div>
+            <div class="icon-label">카카오톡</div>
+        </div>
+        <div class="desktop-icon" id="browserIcon">
+            <div class="icon-img">🌐</div>
+            <div class="icon-label">브라우저</div>
+        </div>
+    </div>
+    <button class="lock-desktop-btn" id="lockScreenBtnDesktop">🔒 화면 잠금</button>
+</div>
+
+<!-- 모달 오버레이 -->
+<div id="modalOverlay" class="modal-overlay">
+    <div class="modal-window">
+        <div class="modal-header">
+            <h3 id="modalTitle">카카오톡</h3>
+            <button class="close-modal" id="closeModalBtn">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody">
+            <!-- 내용은 동적으로 채워짐 -->
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const CORRECT_PASSWORD = "123456";
+        
+        const loginPanel = document.getElementById('loginPanel');
+        const passwordInput = document.getElementById('passwordInput');
+        const unlockButton = document.getElementById('unlockBtn');
+        const errorMsgDiv = document.getElementById('errorMsg');
+        const desktopArea = document.getElementById('desktopArea');
+        const lockDesktopBtn = document.getElementById('lockScreenBtnDesktop');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        
+        let isUnlocked = false;
+        
+        // ========== 카카오톡 (기존 그대로, chat.jpg 유지) ==========
+        function getKakaoContent() {
+            return `
+                <div style="text-align:center;">
+                    <img 
+                        src="chat.jpg"
+                        alt="KakaoTalk 대화"
+                        style="width:100%; border-radius:16px;"
+                        onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22300%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20width%3D%22400%22%20height%3D%22300%22%20fill%3D%22%23366e4a%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%3Echat.jpg%20(이미지%20없음)%3C%2Ftext%3E%3C%2Fsvg%3E';"
+                    >
+                </div>
+            `;
+        }
+        
+        // ========== 브라우저 검색 기록 (건국대학교 도서관 클릭 시 002.png) ==========
+        // 원본 콘텐츠를 저장하기 위한 변수 (복원용)
+        let savedBrowserTitle = "";
+        let savedBrowserContent = "";
+        
+        // 브라우저 메인 화면 (검색 기록 목록) 생성 함수
+        function getBrowserMainContent() {
+            return `
+                <h3 style="margin-bottom: 14px; color:#2c5a3e; text-align:left;">🔍 최근 검색 기록</h3>
+                <ul class="browser-history">
+                    <li>
+                        <span class="history-icon">⭐</span>
+                        <div><span class="history-link" onclick="event.stopPropagation(); showLibraryImage();">건국대학교 도서관</span><br><small>2025.05.20 - 학술 정보 검색 및 좌석 예약 (클릭하여 이미지 보기)</small></div>
+                    </li>
+                    <li>
+                        <span class="history-icon">📚</span>
+                        <div><span class="history-link" style="cursor:default;">건국대학교 중앙도서관 운영시간</span><br><small>2025.05.18 - 도서관 방문 계획</small></div>
+                    </li>
+                    <li>
+                        <span class="history-icon">⭐</span>
+                        <div><span class="history-link" style="cursor:default;">소원을 이루는 방법</span><br><small>2025.05.22 - 검색 15회 / 관련 게시물 탐색</small></div>
+                    </li>
+                    <li>
+                        <span class="history-icon">✨</span>
+                        <div><span class="history-link" style="cursor:default;">바라는 것을 이루는 현실적인 방법</span><br><small>2025.05.19 - 자기계발 아티클 읽음</small></div>
+                    </li>
+                    <li>
+                        <span class="history-icon">🔮</span>
+                        <div><span class="history-link" style="cursor:default;">소원 성취 비결 / 시크릿 방법</span><br><small>2025.05.17 - 동기부여 자료 검색</small></div>
+                    </li>
+                </ul>
+                <hr>
+                <p style="margin-top: 12px; font-size:0.85rem; background:#e5f0de; padding:8px; border-radius:16px;">🌐 동기화된 브라우저 기록 • 관심 주제 집중 분석</p>
+            `;
+        }
+        
+        // 이미지 표시 함수 (002.png)
+        window.showLibraryImage = function() {
+            // 현재 모달의 제목과 내용 저장 (뒤로가기용)
+            savedBrowserTitle = modalTitle.innerText;
+            savedBrowserContent = modalBody.innerHTML;
+            
+            // 이미지 표시로 변경
+            modalTitle.innerText = "건국대학교 도서관 자료";
+            modalBody.innerHTML = `
+                <div style="text-align:center;">
+                    <img src="002.png" alt="건국대학교 도서관 이미지" style="max-width:100%; border-radius:20px; box-shadow:0 4px 12px rgba(0,0,0,0.15); margin-bottom:20px;" onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22300%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20width%3D%22400%22%20height%3D%22300%22%20fill%3D%22%234f7a5c%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%3E002.png%20(이미지%20없음)%3C%2Ftext%3E%3C%2Fsvg%3E';">
+                    <br>
+                    <button class="back-button" onclick="event.stopPropagation(); restoreBrowserHistory();">‹ 뒤로 가기 (검색 기록)</button>
+                </div>
+            `;
+        };
+        
+        // 브라우저 기록 복원 함수
+        window.restoreBrowserHistory = function() {
+            if (savedBrowserTitle && savedBrowserContent) {
+                modalTitle.innerText = savedBrowserTitle;
+                modalBody.innerHTML = savedBrowserContent;
+                // 저장 변수 초기화 (선택)
+                savedBrowserTitle = "";
+                savedBrowserContent = "";
+            } else {
+                // 저장된 내용이 없으면 기본 목록 재생성
+                modalTitle.innerText = "웹 브라우저 (검색 기록)";
+                modalBody.innerHTML = getBrowserMainContent();
+            }
+        };
+        
+        // 브라우저 모달 열기 (초기에는 검색 기록 목록 표시)
+        function openBrowserModal() {
+            modalTitle.innerText = "웹 브라우저 (검색 기록)";
+            modalBody.innerHTML = getBrowserMainContent();
+            modalOverlay.classList.add('active');
+        }
+        
+        // 기타 모달 오픈 함수
+        function openModal(title, contentHtml) {
+            modalTitle.innerText = title;
+            modalBody.innerHTML = contentHtml;
+            modalOverlay.classList.add('active');
+        }
+        
+        function clearError() { if(errorMsgDiv) errorMsgDiv.innerHTML = ''; }
+        function showOnlyPasswordError() { if(errorMsgDiv) errorMsgDiv.innerHTML = '비밀번호 오류'; }
+        
+        function attemptUnlock() {
+            if (isUnlocked) return false;
+            const enteredValue = passwordInput.value;
+            if (enteredValue === CORRECT_PASSWORD) {
+                isUnlocked = true;
+                clearError();
+                if (loginPanel) {
+                    loginPanel.style.opacity = '0';
+                    loginPanel.style.pointerEvents = 'none';
+                    loginPanel.style.transition = 'opacity 0.25s';
+                }
+                if (desktopArea) desktopArea.classList.add('active');
+                passwordInput.value = '';
+                return true;
+            } else {
+                showOnlyPasswordError();
+                passwordInput.style.transform = 'translateX(2px)';
+                setTimeout(() => { if(passwordInput) passwordInput.style.transform = ''; }, 120);
+                passwordInput.style.borderColor = '#ffa07a';
+                setTimeout(() => { if(passwordInput) passwordInput.style.borderColor = 'rgba(160, 190, 130, 0.5)'; }, 500);
+                return false;
+            }
+        }
+        
+        function lockAndReset() {
+            if (desktopArea) desktopArea.classList.remove('active');
+            if (loginPanel) {
+                loginPanel.style.opacity = '1';
+                loginPanel.style.pointerEvents = 'auto';
+            }
+            isUnlocked = false;
+            if (passwordInput) {
+                passwordInput.value = '';
+                passwordInput.style.borderColor = 'rgba(160, 190, 130, 0.5)';
+            }
+            clearError();
+            setTimeout(() => { if(passwordInput) passwordInput.focus(); }, 50);
+            modalOverlay.classList.remove('active');
+            // 초기화 저장 변수도 클리어
+            savedBrowserTitle = "";
+            savedBrowserContent = "";
+        }
+        
+        function onPasswordInputHandler() {
+            if (errorMsgDiv && errorMsgDiv.innerHTML.trim() !== '') clearError();
+            if (passwordInput) passwordInput.style.borderColor = 'rgba(160, 190, 130, 0.5)';
+        }
+        
+        function onGlobalKeydown(e) {
+            if (e.key === 'Enter') {
+                if (!isUnlocked && loginPanel && loginPanel.style.pointerEvents !== 'none') {
+                    e.preventDefault();
+                    attemptUnlock();
+                }
+            }
+        }
+        
+        function closeModal() {
+            modalOverlay.classList.remove('active');
+            // 모달 닫을 때 저장 변수 초기화 (의도치 않은 복원 방지)
+            savedBrowserTitle = "";
+            savedBrowserContent = "";
+        }
+        
+        // 아이콘 이벤트
+        const kakaoIcon = document.getElementById('kakaoIcon');
+        const browserIcon = document.getElementById('browserIcon');
+        
+        if (kakaoIcon) {
+            kakaoIcon.addEventListener('click', () => {
+                if (isUnlocked) openModal('카카오톡 (KakaoTalk)', getKakaoContent());
+            });
+        }
+        if (browserIcon) {
+            browserIcon.addEventListener('click', () => {
+                if (isUnlocked) openBrowserModal();
+            });
+        }
+        
+        if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) closeModal();
+        });
+        
+        if (unlockButton) {
+            unlockButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!isUnlocked) attemptUnlock();
+            });
+        }
+        if (passwordInput) passwordInput.addEventListener('input', onPasswordInputHandler);
+        document.addEventListener('keydown', onGlobalKeydown);
+        if (lockDesktopBtn) lockDesktopBtn.addEventListener('click', (e) => { e.preventDefault(); lockAndReset(); });
+        
+        window.addEventListener('load', () => {
+            if (desktopArea && desktopArea.classList.contains('active')) desktopArea.classList.remove('active');
+            if (loginPanel) {
+                loginPanel.style.opacity = '1';
+                loginPanel.style.pointerEvents = 'auto';
+            }
+            isUnlocked = false;
+            if (passwordInput) { passwordInput.value = ''; passwordInput.focus(); }
+            clearError();
+        });
+    })();
+</script>
+</body>
+</html>
